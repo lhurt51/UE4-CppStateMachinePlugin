@@ -1,0 +1,18 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "4.16",
+	"Category": "",
+	"Description": "",
+	"Modules": [
+		{
+			"Name": "CppStateMachPlug",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+            "AdditionalDependencies": [
+                "CoreUObject",
+                "StateMachine",
+                "Engine"
+            ]
+		}
+	]
+}
