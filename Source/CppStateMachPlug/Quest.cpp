@@ -24,6 +24,8 @@ void UQuestStatus::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 
 void UQuestStatus::UpdateQuests(UStateMach_InputAtom* QuestActivity)
 {
+	TArray<int32> RecentlyCompletedQuests;
+
 	// Update the master list of everything we've ever done
 	QuestActivities.Add(QuestActivity);
 
@@ -32,9 +34,84 @@ void UQuestStatus::UpdateQuests(UStateMach_InputAtom* QuestActivity)
 	{
 		if (QuestList[i].UpdateQuest(this, QuestActivity))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Quest \"%s\" completed: %s"), *QuestList[i].Quest->QuestName.ToString(), (QuestList[i].QuestProgress == EQuestCompletion::EQC_Succeeded) ? TEXT("Success") : TEXT("Failure"));
+			RecentlyCompletedQuests.Add(i);
 		}
+	}
+
+	// Process completed quests after updating all quests
+	// This way a completed quest cant inject out-of-order input atoms into other quests
+	for (int32 i = RecentlyCompletedQuests.Num() - 1; i >= 0; --i)
+	{
+		FQuestInProgress &QIP = QuestList[RecentlyCompletedQuests[i]];
+		if (QIP.QuestProgress == EQuestCompletion::EQC_Succeeded)
+		{
+			QIP.Quest->OnSucceeded(this);
+		}
+		else
+		{
+			QIP.Quest->OnFailed(this);
+		}
+		RecentlyCompletedQuests.RemoveAtSwap(i);
 	}
 }
 
+bool UQuestStatus::BeginQuest(const UQuest *Quest)
+{
+	for (FQuestInProgress &QIP : QuestList)
+	{
+		if (QIP.Quest == Quest)
+		{
+			if (QIP.QuestProgress == EQuestCompletion::EQC_NotStarted)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Changing quest \"%s\" to started status."), *QIP.Quest->QuestName.ToString());
+				QIP.QuestProgress = EQuestCompletion::EQC_Started;
+				return true;
+			}
+			UE_LOG(LogTemp, Warning, TEXT("Quest \"%s\" is an active quest."), *QIP.Quest->QuestName.ToString());
+			return false;
+		}
+	}
+	UE_LOG(LogTemp, Warning, TEXT("Adding quest \"%s\" to the list and starting it."), *Quest->QuestName.ToString());
+	QuestList.Add(FQuestInProgress::NewQuestInProgress(Quest));
+	return true;
+}
 
+void UQuest::OnSucceeded(UQuestStatus *QuestStatus) const
+{
+	UE_LOG(LogTemp, Warning, TEXT("Quest \"%s\" succeeded!"), *QuestName.ToString());
+}
+
+void UQuest::OnFailed(UQuestStatus *QuestStatus) const
+{
+	UE_LOG(LogTemp, Warning, TEXT("Quest \"%s\" failed!"), *QuestName.ToString());
+}
+
+void UQuestWithResults::OnSucceeded(UQuestStatus *QuestStatus) const
+{
+	Super::OnSucceeded(QuestStatus);
+
+	for (UQuest *SuccessQuest : SuccessQuests)
+	{
+		QuestStatus->BeginQuest(SuccessQuest);
+	}
+
+	for (int32 i = 0; i < SuccessInputs.Num(); ++i)
+	{
+		QuestStatus->UpdateQuests(SuccessInputs[i]);
+	}
+}
+
+void UQuestWithResults::OnFailed(UQuestStatus *QuestStatus) const
+{
+	Super::OnFailed(QuestStatus);
+
+	for (UQuest *FailureQuest : FailureQuests)
+	{
+		QuestStatus->BeginQuest(FailureQuest);
+	}
+
+	for (int32 i = 0; i < FailureInputs.Num(); ++i)
+	{
+		QuestStatus->UpdateQuests(FailureInputs[i]);
+	}
+}

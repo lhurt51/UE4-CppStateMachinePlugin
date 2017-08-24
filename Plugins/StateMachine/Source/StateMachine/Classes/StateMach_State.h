@@ -111,8 +111,12 @@ protected:
 	UPROPERTY(EditAnywhere)
 		uint32 bLoopByDefault : 1;
 
-	// Branches to other states. These are in priority order, so the first succesful branch will be taken
+	// Instanced branches to other states. These are in priority order, so the first succesful branch will be taken
 	UPROPERTY(EditAnywhere, Instanced)
 		TArray<UStateMach_Branch*> InstancedBranches;
+
+	// Branches to other states. These are in priority order, so the first succesful branch will be taken. These run after Instance Branches
+	UPROPERTY(EditAnywhere)
+		TArray<UStateMach_Branch*> SharedBranches;
 	
 };

@@ -42,6 +42,9 @@ public:
 	// The blacklist/whitelist (depending on bBlacklist) used to filter imput atoms this Quest recognizes
 	UPROPERTY(EditAnywhere)
 		TArray<UStateMach_InputAtom*> InputList;
+
+	virtual void OnSucceeded(class UQuestStatus* QuestStatus) const;
+	virtual void OnFailed(class UQuestStatus* QuestStatus) const;
 	
 };
 
@@ -87,6 +90,14 @@ public:
 		return false;
 	}
 
+	static FQuestInProgress NewQuestInProgress(const UQuest *_Quest)
+	{
+		FQuestInProgress NewQIP;
+		NewQIP.Quest = _Quest;
+		NewQIP.QuestProgress = EQuestCompletion::EQC_Started;
+		return NewQIP;
+	}
+
 };
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
@@ -108,6 +119,10 @@ public:
 	UFUNCTION(BlueprintCallable, category = "Quests")
 		void UpdateQuests(UStateMach_InputAtom* QuestActivity);
 
+	// add a new quest-in-progress entry, or begin the quest provided if it is already on the list and hasnt been started yet
+	UFUNCTION(BlueprintCallable, category = "Quests")
+		bool BeginQuest(const UQuest *Quest);
+
 protected:
 	// The master list of all quest-related things we've done
 	UPROPERTY(EditAnywhere)
@@ -116,5 +131,34 @@ protected:
 	// The list of quests in our current game or area
 	UPROPERTY(EditAnywhere)
 		TArray<FQuestInProgress> QuestList;
+
+};
+
+UCLASS()
+class CPPSTATEMACHPLUG_API UQuestWithResults : public UQuest
+{
+	GENERATED_BODY()
+
+public:
+
+	virtual void OnSucceeded(class UQuestStatus *QuestStatus) const override;
+	virtual void OnFailed(class UQuestStatus *QuestStatus) const override;
+
+protected:
+	// The quests in the list will go from NotStarted to Started if the current quest succeeds
+	UPROPERTY(EditAnywhere)
+		TArray<UQuest*> SuccessQuests;
+
+	// Input atoms to add if the quest succeeds
+	UPROPERTY(EditAnywhere)
+		TArray<UStateMach_InputAtom*> SuccessInputs;
+
+	// The quests in this list will go from not started to started if the current quest fails
+	UPROPERTY(EditAnywhere)
+		TArray<UQuest*> FailureQuests;
+
+	// Input atoms to add if the quest fails
+	UPROPERTY(EditAnywhere)
+		TArray<UStateMach_InputAtom*> FailureInputs;
 
 };
